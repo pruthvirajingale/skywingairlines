@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkyWing Airlines | Flight Booking & Admin Management</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#0f172a' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @media print {
+      body * { visibility: hidden; }
+      #printable-ticket-section, #printable-ticket-section * { visibility: visible; }
+      #printable-ticket-section { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; }
+    }
+    .seat-transition { transition: all 0.18s ease-in-out; }
+    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col selection:bg-brand-600 selection:text-white">
+
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3 cursor-pointer" onclick="navigateTo('search-view')">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-700 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-brand-600/30">
+          <i data-lucide="plane" class="w-6 h-6 transform -rotate-45"></i>
+        </div>
+        <div>
+          <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-brand-900 to-indigo-700 bg-clip-text text-transparent">SkyWing</span>
+          <span class="text-[10px] uppercase tracking-widest text-brand-600 font-bold block -mt-1">Airlines</span>
+        </div>
+      </div>
+
+      <nav class="flex items-center gap-2 sm:gap-3">
+        <button id="nav-book-btn" onclick="navigateTo('search-view')" class="px-3.5 py-2 text-sm font-semibold rounded-xl text-brand-600 bg-brand-50 transition">
+          Book Flights
+        </button>
+        <button id="nav-trips-btn" onclick="requireAuth(() => navigateTo('my-bookings-view'))" class="relative px-3.5 py-2 text-sm font-medium rounded-xl text-slate-600 hover:text-brand-600 hover:bg-slate-100 transition flex items-center gap-1.5">
+          <i data-lucide="ticket" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">My</span> Bookings
+          <span id="nav-bookings-count" class="hidden px-1.5 py-0.2 text-[10px] font-bold bg-brand-600 text-white rounded-full">0</span>
+        </button>
+        <button id="nav-admin-btn" onclick="navigateTo('admin-view')" class="hidden px-3.5 py-2 text-sm font-bold rounded-xl text-amber-700 bg-amber-50 hover:bg-amber-100 transition items-center gap-1.5 border border-amber-200">
+          <i data-lucide="shield-alert" class="w-4 h-4 text-amber-600"></i>
+          <span>Admin Portal</span>
+        </button>
+        <div class="h-6 w-px bg-slate-200 mx-1"></div>
+        <div id="auth-buttons-container"></div>
+      </nav>
+    </div>
+  </header>
+
+  <main class="flex-1">
+    <div id="search-view" class="transition-all duration-300">
+      <section class="relative bg-gradient-to-b from-brand-900 via-brand-800 to-indigo-950 text-white pt-10 pb-28 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div class="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        <div class="relative max-w-5xl mx-auto text-center">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-brand-100 border border-white/20 mb-3 backdrop-blur-sm">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+            Premium Flight Experience
+          </span>
+          <h1 class="text-3xl sm:text-5xl font-black tracking-tight text-white mb-3">
+            Where Would You Like To Fly?
+          </h1>
+          <p class="text-sm sm:text-base text-blue-100 max-w-xl mx-auto font-light">
+            Search domestic & international routes, choose your cabin seat, and download your boarding pass instantly.
+          </p>
+        </div>
+      </section>
+
+      <section class="max-w-6xl mx-auto px-4 -mt-20 relative z-20">
+        <div class="bg-white rounded-3xl shadow-xl shadow-slate-300/50 border border-slate-200 p-5 sm:p-7">
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+              <button type="button" id="btn-oneway" onclick="setTripMode('oneway')" class="px-4 py-1.5 text-xs sm:text-sm font-semibold rounded-lg bg-white shadow-sm text-brand-700 transition">One Way</button>
+              <button type="button" id="btn-roundtrip" onclick="setTripMode('roundtrip')" class="px-4 py-1.5 text-xs sm:text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition">Round Trip</button>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex items-center gap-2">
+                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Class:</label>
+                <select id="search-class" onchange="runSearch()" class="text-xs sm:text-sm font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-brand-500 outline-none">
+                  <option value="Economy">Economy</option>
+                  <option value="Business">Business Class</option>
+                </select>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Passengers:</label>
+                <select id="search-passengers" onchange="runSearch()" class="text-xs sm:text-sm font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-brand-500 outline-none">
+                  <option value="1">1 Adult</option>
+                  <option value="2">2 Adults</option>
+                  <option value="3">3 Adults</option>
+                  <option value="4">4 Adults</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <form id="search-form" onsubmit="event.preventDefault(); runSearch();" class="grid grid-cols-1 md:grid-cols-12 gap-3 pt-5 items-end">
+            <div class="md:col-span-3">
+              <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Departure (Origin)</label>
+              <select id="search-origin" class="w-full bg-slate-50 font-semibold text-slate-800 text-sm border border-slate-200 rounded-xl px-3.5 py-3 focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                <option value="BOM" selected>Mumbai (BOM)</option>
+                <option value="DEL">Delhi (DEL)</option>
+                <option value="BLR">Bengaluru (BLR)</option>
+                <option value="DXB">Dubai (DXB)</option>
+                <option value="SIN">Singapore (SIN)</option>
+                <option value="LHR">London (LHR)</option>
+              </select>
+            </div>
+            <div class="md:col-span-1 flex items-center justify-center -my-2 md:my-0">
+              <button type="button" onclick="swapAirports()" title="Swap airports" class="p-3 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-brand-600 transition shadow-sm">
+                <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <div class="md:col-span-3">
+              <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Arrival (Destination)</label>
+              <select id="search-dest" class="w-full bg-slate-50 font-semibold text-slate-800 text-sm border border-slate-200 rounded-xl px-3.5 py-3 focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                <option value="DEL" selected>Delhi (DEL)</option>
+                <option value="BOM">Mumbai (BOM)</option>
+                <option value="BLR">Bengaluru (BLR)</option>
+                <option value="DXB">Dubai (DXB)</option>
+                <option value="SIN">Singapore (SIN)</option>
+                <option value="LHR">London (LHR)</option>
+              </select>
+            </div>
+            <div class="md:col-span-3 grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Departure</label>
+                <input type="date" id="search-depart-date" class="w-full bg-slate-50 font-semibold text-slate-800 text-xs sm:text-sm border border-slate-200 rounded-xl px-2.5 py-3 focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+              </div>
+              <div id="return-date-wrap" class="opacity-40 pointer-events-none transition">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Return</label>
+                <input type="date" id="search-return-date" class="w-full bg-slate-50 font-semibold text-slate-800 text-xs sm:text-sm border border-slate-200 rounded-xl px-2.5 py-3 focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+              </div>
+            </div>
+            <div class="md:col-span-2">
+              <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-brand-600/30 flex items-center justify-center gap-2 transition">
+                <i data-lucide="search" class="w-4 h-4"></i>
+                <span>Find Flights</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div class="flex flex-col lg:flex-row gap-6">
+          <aside class="w-full lg:w-72 flex-shrink-0">
+            <div class="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm sticky top-20">
+              <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <span class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <i data-lucide="sliders" class="w-4 h-4 text-brand-600"></i> Filters
+                </span>
+                <button type="button" onclick="resetFilters()" class="text-xs text-brand-600 hover:text-brand-800 font-bold">Reset</button>
+              </div>
+              <div class="mb-5">
+                <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1.5">
+                  <span>Maximum Fare:</span>
+                  <span id="price-slider-display" class="text-brand-600 font-bold">₹50,000</span>
+                </div>
+                <input type="range" id="filter-price" min="3000" max="65000" step="1000" value="65000" oninput="applyFilters()" class="w-full accent-brand-600 cursor-pointer">
+                <div class="flex justify-between text-[10px] text-slate-400 mt-1 font-medium">
+                  <span>₹3,000</span>
+                  <span>₹65,000+</span>
+                </div>
+              </div>
+              <div class="mb-5">
+                <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Stops</h4>
+                <div class="space-y-1.5 text-xs text-slate-600">
+                  <label class="flex items-center gap-2 cursor-pointer hover:text-slate-900">
+                    <input type="checkbox" name="filter-stops" value="0" checked onchange="applyFilters()" class="rounded text-brand-600 focus:ring-brand-500"> Non-stop
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer hover:text-slate-900">
+                    <input type="checkbox" name="filter-stops" value="1" checked onchange="applyFilters()" class="rounded text-brand-600 focus:ring-brand-500"> 1 Stop
+                  </label>
+                </div>
+              </div>
+              <div class="mb-5">
+                <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Airlines</h4>
+                <div class="space-y-1.5 text-xs text-slate-600" id="filter-airlines-list"></div>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Departure Time</h4>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                  <button type="button" onclick="toggleTimeFilter('morning', this)" class="time-filter-tag p-2 rounded-xl border border-slate-200 text-slate-600 hover:border-brand-500 text-center transition">Morning (04-12)</button>
+                  <button type="button" onclick="toggleTimeFilter('afternoon', this)" class="time-filter-tag p-2 rounded-xl border border-slate-200 text-slate-600 hover:border-brand-500 text-center transition">Afternoon (12-18)</button>
+                  <button type="button" onclick="toggleTimeFilter('evening', this)" class="time-filter-tag p-2 rounded-xl border border-slate-200 text-slate-600 hover:border-brand-500 text-center transition col-span-2">Night (18-24)</button>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <div class="flex-1">
+            <div class="bg-white p-4 rounded-3xl border border-slate-200 mb-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 id="search-results-heading" class="font-extrabold text-slate-900 text-lg">Available Flights</h2>
+                <p id="search-results-subheading" class="text-xs text-slate-500">Direct & connecting routes</p>
+              </div>
+              <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+                <button onclick="setSortMode('cheapest')" id="sort-cheapest" class="px-3 py-1.5 rounded-lg bg-white text-brand-700 shadow-sm transition">Cheapest</button>
+                <button onclick="setSortMode('fastest')" id="sort-fastest" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">Fastest</button>
+                <button onclick="setSortMode('earliest')" id="sort-earliest" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">Earliest</button>
+              </div>
+            </div>
+            <div id="flights-container" class="space-y-3.5"></div>
+            <div id="no-flights-notice" class="hidden text-center py-16 bg-white rounded-3xl border border-dashed border-slate-300 p-6">
+              <i data-lucide="plane-off" class="w-12 h-12 text-slate-400 mx-auto mb-2"></i>
+              <h3 class="text-base font-bold text-slate-800">No flights matched your criteria</h3>
+              <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">Adjust your price filter, change your departure city, or click reset.</p>
+              <button onclick="resetFilters()" class="text-xs bg-brand-50 text-brand-700 font-bold px-4 py-2.5 rounded-xl hover:bg-brand-100 transition">Reset All Filters</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Seat View -->
+    <div id="seat-view" class="hidden max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      <div class="flex items-center justify-center gap-3 text-xs font-semibold mb-8">
+        <span class="text-slate-400 flex items-center gap-1.5"><span class="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">1</span> Flight Selected</span>
+        <div class="w-8 h-px bg-slate-300"></div>
+        <span class="text-brand-600 flex items-center gap-1.5 font-bold"><span class="w-5 h-5 rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px]">2</span> Select Seats</span>
+        <div class="w-8 h-px bg-slate-300"></div>
+        <span class="text-slate-400 flex items-center gap-1.5"><span class="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">3</span> Passenger Details & Pay</span>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div class="lg:col-span-7 bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-bold text-slate-900 text-lg">Aircraft Seat Map</h3>
+              <p id="seat-selection-subtitle" class="text-xs text-slate-500">Pick seat(s) for all traveling guests</p>
+            </div>
+            <button onclick="navigateTo('search-view')" class="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1">
+              <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Back to Flights
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-center gap-3.5 py-3 bg-slate-50 rounded-2xl mb-6 text-xs text-slate-600 border border-slate-100">
+            <div class="flex items-center gap-1.5"><div class="w-4 h-4 rounded bg-purple-100 border border-purple-300"></div><span>Business (+₹2,500)</span></div>
+            <div class="flex items-center gap-1.5"><div class="w-4 h-4 rounded bg-blue-50 border border-blue-200"></div><span>Economy Free</span></div>
+            <div class="flex items-center gap-1.5"><div class="w-4 h-4 rounded bg-brand-600 border border-brand-600"></div><span class="font-bold text-brand-700">Selected</span></div>
+            <div class="flex items-center gap-1.5"><div class="w-4 h-4 rounded bg-slate-200 border border-slate-300 opacity-60"></div><span>Occupied</span></div>
+          </div>
+
+          <div class="flex justify-center mb-4">
+            <div class="w-28 h-12 bg-slate-100 rounded-t-full border-t border-x border-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-400">COCKPIT</div>
+          </div>
+          <div class="max-w-xs mx-auto border-x-2 border-slate-200 px-4 py-3">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-purple-700 text-center mb-2">Business Cabin</div>
+            <div id="seat-grid-business" class="grid grid-cols-5 gap-2 mb-6"></div>
+            <div class="relative flex py-2 items-center">
+              <div class="flex-grow border-t border-dashed border-slate-300"></div>
+              <span class="flex-shrink mx-2 text-[9px] uppercase font-black text-slate-400">Main Economy Cabin</span>
+              <div class="flex-grow border-t border-dashed border-slate-300"></div>
+            </div>
+            <div id="seat-grid-economy" class="grid grid-cols-7 gap-1.5 pt-2"></div>
+          </div>
+          <div class="flex justify-center mt-6">
+            <div class="w-36 h-6 bg-slate-100 rounded-b-xl border-b border-x border-slate-200 text-center text-[10px] text-slate-400 pt-0.5">Rear Exits & Galley</div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-5 space-y-4">
+          <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+            <h4 class="font-extrabold text-slate-900 text-base mb-3 pb-2 border-b border-slate-100">Booking Summary</h4>
+            <div id="seat-summary-box" class="space-y-3 text-xs"></div>
+            <div class="mt-5 pt-4 border-t border-slate-100 space-y-2 text-xs">
+              <div class="flex justify-between text-slate-600">
+                <span>Selected Seat(s):</span>
+                <span id="seat-selected-list" class="font-bold text-brand-700">None selected</span>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span>Seat Upgrade Fee:</span>
+                <span id="seat-upgrade-fee" class="font-bold text-slate-900">₹0</span>
+              </div>
+            </div>
+            <button type="button" id="proceed-to-passenger-btn" onclick="proceedToPassengerDetails()" disabled class="w-full mt-6 bg-brand-600 hover:bg-brand-700 disabled:bg-slate-300 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed">
+              <span>Continue to Passenger Info</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Passenger Details View -->
+    <div id="passenger-view" class="hidden max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      <div class="flex items-center justify-center gap-3 text-xs font-semibold mb-8">
+        <span class="text-slate-400 flex items-center gap-1.5"><span class="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">1</span> Flight</span>
+        <div class="w-8 h-px bg-slate-300"></div>
+        <span class="text-slate-400 flex items-center gap-1.5"><span class="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">2</span> Seats</span>
+        <div class="w-8 h-px bg-slate-300"></div>
+        <span class="text-brand-600 flex items-center gap-1.5 font-bold"><span class="w-5 h-5 rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px]">3</span> Passenger Details & Pay</span>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div class="lg:col-span-7 space-y-6">
+          <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-extrabold text-slate-900 text-lg">Primary Passenger Details</h3>
+              <button onclick="navigateTo('seat-view')" class="text-xs font-bold text-brand-600 hover:text-brand-800">Edit Seats</button>
+            </div>
+            <form id="passenger-info-form" class="space-y-4 text-xs">
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                <div class="sm:col-span-3">
+                  <label class="block font-bold text-slate-600 mb-1">Title</label>
+                  <select id="p-title" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium focus:outline-none">
+                    <option>Mr</option><option>Ms</option><option>Mrs</option><option>Dr</option>
+                  </select>
+                </div>
+                <div class="sm:col-span-5">
+                  <label class="block font-bold text-slate-600 mb-1">First Name *</label>
+                  <input type="text" id="p-firstname" required placeholder="e.g. Rahul" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium focus:ring-2 focus:ring-brand-500">
+                </div>
+                <div class="sm:col-span-4">
+                  <label class="block font-bold text-slate-600 mb-1">Last Name *</label>
+                  <input type="text" id="p-lastname" required placeholder="e.g. Sharma" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium focus:ring-2 focus:ring-brand-500">
+                </div>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block font-bold text-slate-600 mb-1">Email *</label>
+                  <input type="email" id="p-email" required placeholder="passenger@example.com" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium">
+                </div>
+                <div>
+                  <label class="block font-bold text-slate-600 mb-1">Mobile Phone *</label>
+                  <input type="tel" id="p-phone" required placeholder="+91 98765 43210" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium">
+                </div>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label class="block font-bold text-slate-600 mb-1">Meal Preference</label>
+                  <select id="p-meal" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium">
+                    <option value="Complimentary Snack Box">Complimentary Snack Box</option>
+                    <option value="Asian Vegetarian">Asian Vegetarian</option>
+                    <option value="Pure Jain Meal">Pure Jain Vegetarian</option>
+                    <option value="Non-Vegetarian Delight">Non-Vegetarian Hot Meal</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block font-bold text-slate-600 mb-1">Frequent Flyer No.</label>
+                  <input type="text" id="p-ffn" placeholder="SKW-9092" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium">
+                </div>
+              </div>
+              <div class="pt-4 border-t border-slate-100">
+                <h4 class="font-extrabold text-slate-800 text-sm mb-3">Optional Add-ons</h4>
+                <div class="space-y-2">
+                  <label class="flex items-center justify-between p-3 rounded-2xl border border-slate-200 hover:border-brand-500 cursor-pointer">
+                    <div class="flex items-center gap-3">
+                      <input type="checkbox" id="addon-baggage" onchange="calculateFareBreakdown()" class="rounded text-brand-600">
+                      <div><span class="font-bold text-slate-800 block">Extra 10kg Check-in Luggage</span><span class="text-[11px] text-slate-500">Long stays & extra packing</span></div>
+                    </div>
+                    <span class="font-bold text-slate-800">+₹1,200</span>
+                  </label>
+                  <label class="flex items-center justify-between p-3 rounded-2xl border border-slate-200 hover:border-brand-500 cursor-pointer">
+                    <div class="flex items-center gap-3">
+                      <input type="checkbox" id="addon-insurance" onchange="calculateFareBreakdown()" class="rounded text-brand-600">
+                      <div><span class="font-bold text-slate-800 block">Flight Insurance</span><span class="text-[11px] text-slate-500">Covers delays & medical loss</span></div>
+                    </div>
+                    <span class="font-bold text-slate-800">+₹450</span>
+                  </label>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="lg:col-span-5 space-y-4">
+          <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+            <h3 class="font-extrabold text-slate-900 text-base mb-4 pb-2 border-b border-slate-100">Fare Summary</h3>
+            <div class="mb-4">
+              <label class="block text-xs font-bold text-slate-600 mb-1.5">Apply Promo Code</label>
+              <div class="flex gap-2">
+                <input type="text" id="promo-input" placeholder="SKY500 or ADMIN10" class="flex-1 uppercase font-mono text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
+                <button type="button" onclick="applyPromoCode()" class="bg-slate-900 hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl">Apply</button>
+              </div>
+              <p id="promo-status-msg" class="text-[11px] mt-1 hidden"></p>
+            </div>
+            <div class="space-y-2 text-xs border-t border-slate-100 pt-3">
+              <div class="flex justify-between text-slate-600"><span id="fare-base-label">Base Airfare</span><span id="breakdown-base-fare" class="font-semibold text-slate-900">₹0</span></div>
+              <div class="flex justify-between text-slate-600"><span>Airport Taxes & GST (12%)</span><span id="breakdown-taxes" class="font-semibold text-slate-900">₹0</span></div>
+              <div class="flex justify-between text-slate-600"><span>Seat Selection Surcharge</span><span id="breakdown-seat-fees" class="font-semibold text-slate-900">₹0</span></div>
+              <div class="flex justify-between text-slate-600"><span>Add-ons</span><span id="breakdown-addons" class="font-semibold text-slate-900">₹0</span></div>
+              <div id="breakdown-discount-row" class="hidden flex justify-between text-emerald-600 font-bold"><span>Promo Discount</span><span id="breakdown-discount">-₹0</span></div>
+              <div class="border-t border-slate-200 pt-3 flex justify-between text-base font-extrabold text-slate-900"><span>Total Amount Due</span><span id="breakdown-total" class="text-brand-600">₹0</span></div>
+            </div>
+            <div class="mt-6">
+              <button type="button" onclick="executeBookingPayment()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                <i data-lucide="credit-card" class="w-5 h-5"></i><span>Pay & Confirm Flight</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- My Bookings View -->
+    <div id="my-bookings-view" class="hidden max-w-5xl mx-auto px-4 sm:px-6 py-10">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 mb-6 gap-3">
+        <div>
+          <h2 class="text-2xl font-extrabold text-slate-900">My Booked Trips</h2>
+          <p class="text-xs text-slate-500">Manage and view your confirmed flight tickets</p>
+        </div>
+        <button onclick="navigateTo('search-view')" class="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-1.5">
+          <i data-lucide="plus" class="w-4 h-4"></i> Book New Flight
+        </button>
+      </div>
+      <div id="user-bookings-list" class="space-y-4"></div>
+      <div id="no-user-bookings" class="hidden text-center py-20 bg-white rounded-3xl border border-slate-200">
+        <div class="w-16 h-16 bg-blue-50 text-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-3"><i data-lucide="plane" class="w-8 h-8"></i></div>
+        <h3 class="text-base font-bold text-slate-800">No active bookings found</h3>
+        <p class="text-xs text-slate-500 mt-1 mb-5">You haven't reserved any flights with this account yet.</p>
+        <button onclick="navigateTo('search-view')" class="text-xs font-bold bg-brand-600 text-white px-5 py-2.5 rounded-xl">Book A Flight Now</button>
+      </div>
+    </div>
+
+    <!-- Admin View -->
+    <div id="admin-view" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-200 mb-8 gap-4">
+        <div>
+          <span class="px-2.5 py-0.5 rounded-lg text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">Admin Control Center</span>
+          <h2 class="text-2xl font-black text-slate-900 mt-1">Flight Operations & Fleet Management</h2>
+          <p class="text-xs text-slate-500">Add, edit, or cancel flights and monitor system-wide passenger reservations.</p>
+        </div>
+        <button onclick="openFlightModal()" class="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i> Add New Flight
+        </button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div class="w-12 h-12 rounded-2xl bg-blue-50 text-brand-600 flex items-center justify-center font-bold"><i data-lucide="plane-takeoff" class="w-6 h-6"></i></div>
+          <div><span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Flights</span><div id="stat-total-flights" class="text-2xl font-black text-slate-900">0</div></div>
+        </div>
+        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold"><i data-lucide="users" class="w-6 h-6"></i></div>
+          <div><span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Bookings</span><div id="stat-total-bookings" class="text-2xl font-black text-slate-900">0</div></div>
+        </div>
+        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold"><i data-lucide="indian-rupee" class="w-6 h-6"></i></div>
+          <div><span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Revenue</span><div id="stat-total-revenue" class="text-2xl font-black text-slate-900">₹0</div></div>
+        </div>
+      </div>
+      <div class="space-y-6">
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-5 border-b border-slate-100 flex items-center justify-between"><h3 class="font-extrabold text-slate-900 text-base">Fleet & Flight Schedules</h3></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200">
+                  <th class="p-4">Flight</th><th class="p-4">Airline</th><th class="p-4">Route</th><th class="p-4">Schedule</th><th class="p-4">Duration</th><th class="p-4">Stops</th><th class="p-4">Base Fare</th><th class="p-4">Seats</th><th class="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="admin-flights-table-body" class="divide-y divide-slate-100 font-medium"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-5 border-b border-slate-100 flex items-center justify-between"><h3 class="font-extrabold text-slate-900 text-base">All User Reservations</h3></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200">
+                  <th class="p-4">PNR</th><th class="p-4">Passenger</th><th class="p-4">User Account</th><th class="p-4">Flight</th><th class="p-4">Travel Date</th><th class="p-4">Seats</th><th class="p-4">Paid Total</th><th class="p-4">Status</th>
+                </tr>
+              </thead>
+              <tbody id="admin-bookings-table-body" class="divide-y divide-slate-100 font-medium"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Auth Modal -->
+  <div id="auth-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl relative">
+      <button onclick="closeAuthModal()" class="absolute top-5 right-5 text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-2xl mb-6">
+        <button id="auth-tab-login" onclick="switchAuthTab('login')" class="flex-1 py-2 text-xs font-bold rounded-xl bg-white text-slate-900 shadow-sm transition">Sign In</button>
+        <button id="auth-tab-register" onclick="switchAuthTab('register')" class="flex-1 py-2 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 transition">Create Account</button>
+      </div>
+      <div id="login-form-box">
+        <h3 class="text-xl font-black text-slate-900 mb-1">Welcome Back</h3>
+        <p class="text-xs text-slate-500 mb-4">Log in to book flights, select seats and download tickets.</p>
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 mb-4 text-xs">
+          <span class="font-bold text-amber-900 flex items-center gap-1.5 mb-1"><i data-lucide="key" class="w-3.5 h-3.5 text-amber-700"></i> Demo Credentials:</span>
+          <div class="text-slate-600 space-y-0.5 text-[11px]">
+            <div><strong>Admin:</strong> <code class="bg-amber-100 px-1 rounded">admin@skywing.com</code> / <code class="bg-amber-100 px-1 rounded">admin123</code></div>
+            <div><strong>Customer:</strong> <code class="bg-amber-100 px-1 rounded">customer@demo.com</code> / <code class="bg-amber-100 px-1 rounded">pass123</code></div>
+          </div>
+        </div>
+        <form onsubmit="handleLoginSubmit(event)" class="space-y-3.5 text-xs">
+          <div><label class="block font-bold text-slate-600 mb-1">Email Address</label><input type="email" id="login-email" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5"></div>
+          <div><label class="block font-bold text-slate-600 mb-1">Password</label><input type="password" id="login-password" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5"></div>
+          <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl">Sign In to Account</button>
+        </form>
+      </div>
+      <div id="register-form-box" class="hidden">
+        <h3 class="text-xl font-black text-slate-900 mb-1">Create Account</h3>
+        <p class="text-xs text-slate-500 mb-4">Register as a customer or admin manager.</p>
+        <form onsubmit="handleRegisterSubmit(event)" class="space-y-3.5 text-xs">
+          <div><label class="block font-bold text-slate-600 mb-1">Full Name</label><input type="text" id="reg-name" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5"></div>
+          <div><label class="block font-bold text-slate-600 mb-1">Email Address</label><input type="email" id="reg-email" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5"></div>
+          <div><label class="block font-bold text-slate-600 mb-1">Password</label><input type="password" id="reg-password" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5"></div>
+          <div>
+            <label class="block font-bold text-slate-600 mb-1">Account Role</label>
+            <select id="reg-role" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5">
+              <option value="customer">Customer (Traveler)</option>
+              <option value="admin">Airline Administrator</option>
+            </select>
+          </div>
+          <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl">Register & Continue</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flight Modal -->
+  <div id="flight-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scroll">
+      <button onclick="closeFlightModal()" class="absolute top-5 right-5 text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <h3 id="flight-modal-title" class="text-xl font-black text-slate-900 mb-1">Add New Flight</h3>
+      <p class="text-xs text-slate-500 mb-5">Configure schedules, pricing, and aircraft specifications.</p>
+      <form id="flight-form" onsubmit="handleSaveFlight(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="edit-flight-id">
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block font-bold text-slate-600 mb-1">Flight Number *</label><input type="text" id="mf-flightNo" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-mono uppercase"></div>
+          <div>
+            <label class="block font-bold text-slate-600 mb-1">Airline Carrier *</label>
+            <select id="mf-airline" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-medium">
+              <option value="Air India">Air India</option><option value="IndiGo">IndiGo</option><option value="Vistara">Vistara</option><option value="Emirates">Emirates</option><option value="Singapore Air">Singapore Air</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block font-bold text-slate-600 mb-1">Origin Code *</label><select id="mf-origin" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-medium"><option value="BOM">Mumbai (BOM)</option><option value="DEL">Delhi (DEL)</option><option value="BLR">Bengaluru (BLR)</option><option value="DXB">Dubai (DXB)</option><option value="SIN">Singapore (SIN)</option><option value="LHR">London (LHR)</option></select></div>
+          <div><label class="block font-bold text-slate-600 mb-1">Destination Code *</label><select id="mf-dest" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-medium"><option value="DEL">Delhi (DEL)</option><option value="BOM">Mumbai (BOM)</option><option value="BLR">Bengaluru (BLR)</option><option value="DXB">Dubai (DXB)</option><option value="SIN">Singapore (SIN)</option><option value="LHR">London (LHR)</option></select></div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div><label class="block font-bold text-slate-600 mb-1">Departure Time *</label><input type="text" id="mf-departTime" required placeholder="08:30" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"></div>
+          <div><label class="block font-bold text-slate-600 mb-1">Arrival Time *</label><input type="text" id="mf-arriveTime" required placeholder="10:45" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"></div>
+          <div><label class="block font-bold text-slate-600 mb-1">Duration *</label><input type="text" id="mf-duration" required placeholder="2h 15m" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"></div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div><label class="block font-bold text-slate-600 mb-1">Base Price (₹) *</label><input type="number" id="mf-basePrice" required min="1000" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"></div>
+          <div><label class="block font-bold text-slate-600 mb-1">Stops *</label><select id="mf-stops" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"><option value="0">Non-stop (Direct)</option><option value="1">1 Stop</option></select></div>
+          <div><label class="block font-bold text-slate-600 mb-1">Available Seats *</label><input type="number" id="mf-seats" required min="1" max="300" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block font-bold text-slate-600 mb-1">Aircraft Model</label><input type="text" id="mf-aircraft" placeholder="Airbus A321neo" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"></div>
+          <div><label class="block font-bold text-slate-600 mb-1">Layover City</label><input type="text" id="mf-layover" placeholder="e.g. HYD (45m)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"></div>
+        </div>
+        <div class="pt-3 flex gap-2">
+          <button type="button" onclick="closeFlightModal()" class="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl">Cancel</button>
+          <button type="submit" class="w-1/2 bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-xl">Save Flight</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div id="confirmation-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl relative my-8">
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2"><i data-lucide="check-circle" class="w-8 h-8"></i></div>
+        <h2 class="text-2xl font-black text-slate-900">Flight Booking Confirmed!</h2>
+        <p class="text-xs text-slate-500">Your digital e-ticket and boarding pass are ready below.</p>
+      </div>
+      <div id="printable-ticket-section" class="bg-gradient-to-br from-slate-900 via-indigo-950 to-brand-950 text-white rounded-3xl p-6 shadow-xl border border-slate-700 relative overflow-hidden">
+        <div class="flex items-center justify-between border-b border-white/15 pb-4 mb-4">
+          <div class="flex items-center gap-2"><span class="text-lg font-black tracking-tight text-white">SkyWing</span><span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-white/20 text-white">Boarding Pass</span></div>
+          <div class="text-right"><span class="text-[9px] text-slate-400 uppercase tracking-widest block font-bold">Booking PNR</span><span id="ticket-pnr" class="text-base font-mono font-black tracking-widest text-amber-400">SKW-XXXX</span></div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 items-center text-center my-4">
+          <div class="text-left"><div id="ticket-origin" class="text-2xl sm:text-3xl font-black">BOM</div><div id="ticket-origin-city" class="text-xs text-slate-300">Mumbai</div><div id="ticket-depart-time" class="text-xs font-bold text-amber-300 mt-1">08:00 AM</div></div>
+          <div class="flex flex-col items-center">
+            <span id="ticket-airline" class="text-xs font-semibold text-slate-300">IndiGo</span>
+            <div class="w-full flex items-center my-1"><div class="h-px bg-slate-600 flex-1"></div><i data-lucide="plane" class="w-4 h-4 text-brand-400 mx-2"></i><div class="h-px bg-slate-600 flex-1"></div></div>
+            <span id="ticket-duration" class="text-[10px] text-slate-400">2h 15m</span>
+          </div>
+          <div class="text-right"><div id="ticket-dest" class="text-2xl sm:text-3xl font-black">DEL</div><div id="ticket-dest-city" class="text-xs text-slate-300">Delhi</div><div id="ticket-arrive-time" class="text-xs font-bold text-amber-300 mt-1">10:15 AM</div></div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/10 p-3.5 rounded-2xl border border-white/10 text-xs">
+          <div><span class="text-[9px] text-slate-400 uppercase font-bold block">Passenger</span><span id="ticket-passenger" class="font-bold truncate block">Rahul Sharma</span></div>
+          <div><span class="text-[9px] text-slate-400 uppercase font-bold block">Date</span><span id="ticket-date" class="font-bold">2026-10-15</span></div>
+          <div><span class="text-[9px] text-slate-400 uppercase font-bold block">Seat(s)</span><span id="ticket-seat" class="font-bold text-amber-300 font-mono">14B</span></div>
+          <div><span class="text-[9px] text-slate-400 uppercase font-bold block">Class</span><span id="ticket-class" class="font-bold">Economy</span></div>
+        </div>
+      </div>
+      <div class="flex flex-col sm:flex-row items-center gap-3 mt-6">
+        <button onclick="window.print()" class="w-full sm:flex-1 bg-slate-900 hover:bg-black text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2"><i data-lucide="printer" class="w-4 h-4"></i><span>Print / Save PDF</span></button>
+        <button onclick="closeConfirmationAndGoTrips()" class="w-full sm:flex-1 bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2"><i data-lucide="check" class="w-4 h-4"></i><span>Go to My Bookings</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 pointer-events-none">
+    <i data-lucide="info" class="w-4 h-4 text-brand-400"></i>
+    <span id="toast-text">Notification message</span>
+  </div>
+
+  <!-- Connected Client Controller -->
+  <script>
+    const API_BASE = 'http://localhost:5000/api';
+
+    const AIRPORTS = {
+      BOM: { city: 'Mumbai', name: 'Chhatrapati Shivaji Maharaj Intl' },
+      DEL: { city: 'Delhi', name: 'Indira Gandhi Intl Airport' },
+      BLR: { city: 'Bengaluru', name: 'Kempegowda Intl Airport' },
+      DXB: { city: 'Dubai', name: 'Dubai International Airport' },
+      SIN: { city: 'Singapore', name: 'Singapore Changi Airport' },
+      LHR: { city: 'London', name: 'Heathrow Airport' }
+    };
+
+    let appState = {
+      currentUser: null,
+      tripMode: 'oneway',
+      origin: 'BOM',
+      dest: 'DEL',
+      travelClass: 'Economy',
+      passengers: 1,
+      departDate: '2026-10-15',
+      returnDate: '2026-10-22',
+      sortMode: 'cheapest',
+      activeTimeFilter: null,
+      selectedFlight: null,
+      selectedSeats: [],
+      selectedSeatFees: 0,
+      appliedDiscount: 0,
+      pendingAuthCallback: null,
+      cachedFlights: []
+    };
+
+    // --- API Helpers ---
+    async function apiRequest(endpoint, options = {}) {
+      try {
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+          headers: { 'Content-Type': 'application/json' },
+          ...options
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Server error');
+        return data;
+      } catch (err) {
+        showToast(err.message);
+        throw err;
+      }
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const text = document.getElementById('toast-text');
+      text.textContent = message;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+        toast.classList.remove('translate-y-0', 'opacity-100');
+      }, 3000);
+    }
+
+    function navigateTo(viewId) {
+      ['search-view', 'seat-view', 'passenger-view', 'my-bookings-view', 'admin-view'].forEach(v => {
+        const el = document.getElementById(v);
+        if (el) el.classList.add('hidden');
+      });
+
+      const activeView = document.getElementById(viewId);
+      if (activeView) {
+        activeView.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      const navBook = document.getElementById('nav-book-btn');
+      const navTrips = document.getElementById('nav-trips-btn');
+      const navAdmin = document.getElementById('nav-admin-btn');
+
+      navBook.className = "px-3.5 py-2 text-sm font-semibold rounded-xl text-slate-600 hover:text-brand-600 hover:bg-slate-100 transition";
+      navTrips.className = "relative px-3.5 py-2 text-sm font-medium rounded-xl text-slate-600 hover:text-brand-600 hover:bg-slate-100 transition flex items-center gap-1.5";
+      navAdmin.className = "hidden px-3.5 py-2 text-sm font-bold rounded-xl text-amber-700 bg-amber-50 hover:bg-amber-100 transition items-center gap-1.5 border border-amber-200";
+
+      if (appState.currentUser && appState.currentUser.role === 'admin') {
+        navAdmin.classList.remove('hidden');
+        navAdmin.classList.add('flex');
+      }
+
+      if (viewId === 'search-view') navBook.className = "px-3.5 py-2 text-sm font-semibold rounded-xl text-brand-600 bg-brand-50 transition";
+      else if (viewId === 'my-bookings-view') {
+        navTrips.className = "relative px-3.5 py-2 text-sm font-bold rounded-xl text-brand-600 bg-brand-50 transition flex items-center gap-1.5";
+        renderUserBookings();
+      } else if (viewId === 'admin-view') {
+        navAdmin.className = "px-3.5 py-2 text-sm font-black rounded-xl text-amber-900 bg-amber-200 transition flex items-center gap-1.5 border border-amber-400";
+        renderAdminDashboard();
+      }
+
+      lucide.createIcons();
+    }
+
+    function requireAuth(callback) {
+      if (appState.currentUser) callback();
+      else {
+        appState.pendingAuthCallback = callback;
+        openAuthModal('login');
+      }
+    }
+
+    function openAuthModal(tab = 'login') {
+      switchAuthTab(tab);
+      document.getElementById('auth-modal').classList.remove('hidden');
+      document.getElementById('auth-modal').classList.add('flex');
+    }
+
+    function closeAuthModal() {
+      document.getElementById('auth-modal').classList.add('hidden');
+      document.getElementById('auth-modal').classList.remove('flex');
+    }
+
+    function switchAuthTab(tab) {
+      const loginTab = document.getElementById('auth-tab-login');
+      const regTab = document.getElementById('auth-tab-register');
+      const loginBox = document.getElementById('login-form-box');
+      const regBox = document.getElementById('register-form-box');
+
+      if (tab === 'login') {
+        loginTab.className = "flex-1 py-2 text-xs font-bold rounded-xl bg-white text-slate-900 shadow-sm transition";
+        regTab.className = "flex-1 py-2 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 transition";
+        loginBox.classList.remove('hidden');
+        regBox.classList.add('hidden');
+      } else {
+        regTab.className = "flex-1 py-2 text-xs font-bold rounded-xl bg-white text-slate-900 shadow-sm transition";
+        loginTab.className = "flex-1 py-2 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 transition";
+        regBox.classList.remove('hidden');
+        loginBox.classList.add('hidden');
+      }
+    }
+
+    async function handleLoginSubmit(event) {
+      event.preventDefault();
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+
+      try {
+        const data = await apiRequest('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password })
+        });
+        appState.currentUser = data.user;
+        localStorage.setItem('skywing_active_session', JSON.stringify(data.user));
+        closeAuthModal();
+        updateAuthUI();
+        showToast(`Welcome back, ${data.user.name}!`);
+        if (appState.pendingAuthCallback) {
+          const cb = appState.pendingAuthCallback;
+          appState.pendingAuthCallback = null;
+          cb();
+        }
+      } catch (err) { /* Toast already handled */ }
+    }
+
+    async function handleRegisterSubmit(event) {
+      event.preventDefault();
+      const name = document.getElementById('reg-name').value.trim();
+      const email = document.getElementById('reg-email').value.trim();
+      const password = document.getElementById('reg-password').value;
+      const role = document.getElementById('reg-role').value;
+
+      try {
+        const data = await apiRequest('/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({ name, email, password, role })
+        });
+        appState.currentUser = data.user;
+        localStorage.setItem('skywing_active_session', JSON.stringify(data.user));
+        closeAuthModal();
+        updateAuthUI();
+        showToast(`Account registered as ${role}!`);
+        if (appState.pendingAuthCallback) {
+          const cb = appState.pendingAuthCallback;
+          appState.pendingAuthCallback = null;
+          cb();
+        }
+      } catch (err) { /* Toast handled */ }
+    }
+
+    function handleLogout() {
+      appState.currentUser = null;
+      localStorage.removeItem('skywing_active_session');
+      updateAuthUI();
+      navigateTo('search-view');
+      showToast('Logged out successfully.');
+    }
+
+    async function updateAuthUI() {
+      const container = document.getElementById('auth-buttons-container');
+      const adminNavBtn = document.getElementById('nav-admin-btn');
+
+      if (appState.currentUser) {
+        const roleBadge = appState.currentUser.role === 'admin'
+          ? '<span class="px-1.5 py-0.5 text-[10px] font-black uppercase bg-amber-100 text-amber-800 rounded">Admin</span>'
+          : '<span class="px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-800 rounded">Member</span>';
+
+        container.innerHTML = `
+          <div class="flex items-center gap-2">
+            <div class="text-right hidden sm:block">
+              <div class="text-xs font-bold text-slate-800 flex items-center justify-end gap-1.5">${appState.currentUser.name} ${roleBadge}</div>
+              <div class="text-[10px] text-slate-400 font-mono">${appState.currentUser.email}</div>
+            </div>
+            <button onclick="handleLogout()" title="Log Out" class="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition"><i data-lucide="log-out" class="w-4 h-4"></i></button>
+          </div>
+        `;
+
+        if (appState.currentUser.role === 'admin') {
+          adminNavBtn.classList.remove('hidden');
+          adminNavBtn.classList.add('flex');
+        } else {
+          adminNavBtn.classList.add('hidden');
+          adminNavBtn.classList.remove('flex');
+        }
+      } else {
+        container.innerHTML = `
+          <div class="flex items-center gap-2">
+            <button onclick="openAuthModal('login')" class="text-xs font-bold text-slate-700 hover:text-brand-600 px-3 py-2 rounded-xl transition">Sign In</button>
+            <button onclick="openAuthModal('register')" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition">Sign Up</button>
+          </div>
+        `;
+        adminNavBtn.classList.add('hidden');
+        adminNavBtn.classList.remove('flex');
+      }
+
+      await updateUserBookingsBadge();
+      lucide.createIcons();
+    }
+
+    function setTripMode(mode) {
+      appState.tripMode = mode;
+      const oneway = document.getElementById('btn-oneway');
+      const roundtrip = document.getElementById('btn-roundtrip');
+      const retWrap = document.getElementById('return-date-wrap');
+
+      if (mode === 'oneway') {
+        oneway.className = "px-4 py-1.5 text-xs sm:text-sm font-semibold rounded-lg bg-white shadow-sm text-brand-700 transition";
+        roundtrip.className = "px-4 py-1.5 text-xs sm:text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition";
+        retWrap.classList.add('opacity-40', 'pointer-events-none');
+      } else {
+        roundtrip.className = "px-4 py-1.5 text-xs sm:text-sm font-semibold rounded-lg bg-white shadow-sm text-brand-700 transition";
+        oneway.className = "px-4 py-1.5 text-xs sm:text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition";
+        retWrap.classList.remove('opacity-40', 'pointer-events-none');
+      }
+    }
+
+    function swapAirports() {
+      const orig = document.getElementById('search-origin');
+      const dest = document.getElementById('search-dest');
+      const tmp = orig.value;
+      orig.value = dest.value;
+      dest.value = tmp;
+      runSearch();
+    }
+
+    async function runSearch() {
+      const orig = document.getElementById('search-origin').value;
+      const dest = document.getElementById('search-dest').value;
+
+      if (orig === dest) {
+        showToast('Departure and arrival airports must be different!');
+        return;
+      }
+
+      appState.origin = orig;
+      appState.dest = dest;
+      appState.travelClass = document.getElementById('search-class').value;
+      appState.passengers = parseInt(document.getElementById('search-passengers').value, 10);
+      appState.departDate = document.getElementById('search-depart-date').value;
+
+      document.getElementById('search-results-heading').textContent = `${AIRPORTS[orig]?.city || orig} (${orig}) → ${AIRPORTS[dest]?.city || dest} (${dest})`;
+      document.getElementById('search-results-subheading').textContent = `Showing flights for ${appState.passengers} traveler(s) in ${appState.travelClass}`;
+
+      try {
+        const flights = await apiRequest('/flights');
+        appState.cachedFlights = flights;
+        renderAirlineFilterOptions(flights);
+        applyFilters();
+      } catch (err) {}
+    }
+
+    function renderAirlineFilterOptions(flights) {
+      const distinctAirlines = [...new Set(flights.map(f => f.airline))];
+      const container = document.getElementById('filter-airlines-list');
+      container.innerHTML = distinctAirlines.map(airline => `
+        <label class="flex items-center gap-2 cursor-pointer hover:text-slate-900">
+          <input type="checkbox" name="filter-airline" value="${airline}" checked onchange="applyFilters()" class="rounded text-brand-600 focus:ring-brand-500">
+          ${airline}
+        </label>
+      `).join('');
+    }
+
+    function toggleTimeFilter(slot, btnElement) {
+      if (appState.activeTimeFilter === slot) {
+        appState.activeTimeFilter = null;
+        btnElement.classList.remove('bg-brand-50', 'border-brand-500', 'text-brand-700', 'font-bold');
+      } else {
+        document.querySelectorAll('.time-filter-tag').forEach(b => b.classList.remove('bg-brand-50', 'border-brand-500', 'text-brand-700', 'font-bold'));
+        appState.activeTimeFilter = slot;
+        btnElement.classList.add('bg-brand-50', 'border-brand-500', 'text-brand-700', 'font-bold');
+      }
+      applyFilters();
+    }
+
+    function resetFilters() {
+      document.getElementById('filter-price').value = 65000;
+      document.querySelectorAll('input[name="filter-stops"]').forEach(cb => cb.checked = true);
+      document.querySelectorAll('input[name="filter-airline"]').forEach(cb => cb.checked = true);
+      document.querySelectorAll('.time-filter-tag').forEach(b => b.classList.remove('bg-brand-50', 'border-brand-500', 'text-brand-700', 'font-bold'));
+      appState.activeTimeFilter = null;
+      applyFilters();
+    }
+
+    function setSortMode(mode) {
+      appState.sortMode = mode;
+      ['cheapest', 'fastest', 'earliest'].forEach(m => {
+        const btn = document.getElementById(`sort-${m}`);
+        if (m === mode) btn.className = "px-3 py-1.5 rounded-lg bg-white text-brand-700 shadow-sm transition font-bold";
+        else btn.className = "px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition font-medium";
+      });
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const maxPrice = parseInt(document.getElementById('filter-price').value, 10);
+      document.getElementById('price-slider-display').textContent = `₹${maxPrice.toLocaleString('en-IN')}`;
+
+      const checkedStops = Array.from(document.querySelectorAll('input[name="filter-stops"]:checked')).map(el => parseInt(el.value, 10));
+      const checkedAirlines = Array.from(document.querySelectorAll('input[name="filter-airline"]:checked')).map(el => el.value);
+
+      let matched = appState.cachedFlights.filter(f => {
+        const matchRoute = f.origin === appState.origin && f.dest === appState.dest;
+        const matchPrice = f.basePrice <= maxPrice;
+        const matchStops = checkedStops.includes(f.stops);
+        const matchAirline = checkedAirlines.length === 0 || checkedAirlines.includes(f.airline);
+
+        let matchTime = true;
+        if (appState.activeTimeFilter) {
+          const hour = parseInt(f.departTime.split(':')[0], 10);
+          if (appState.activeTimeFilter === 'morning') matchTime = hour >= 4 && hour < 12;
+          else if (appState.activeTimeFilter === 'afternoon') matchTime = hour >= 12 && hour < 18;
+          else if (appState.activeTimeFilter === 'evening') matchTime = hour >= 18;
+        }
+
+        return matchRoute && matchPrice && matchStops && matchAirline && matchTime;
+      });
+
+      if (appState.sortMode === 'cheapest') matched.sort((a, b) => a.basePrice - b.basePrice);
+      else if (appState.sortMode === 'fastest') matched.sort((a, b) => (a.durationMinutes || 120) - (b.durationMinutes || 120));
+      else if (appState.sortMode === 'earliest') matched.sort((a, b) => a.departTime.localeCompare(b.departTime));
+
+      renderFlightCards(matched);
+    }
+
+    function renderFlightCards(flights) {
+      const container = document.getElementById('flights-container');
+      const notice = document.getElementById('no-flights-notice');
+
+      if (!flights || flights.length === 0) {
+        container.innerHTML = '';
+        notice.classList.remove('hidden');
+        return;
+      }
+
+      notice.classList.add('hidden');
+      container.innerHTML = flights.map(flight => {
+        const multiplier = appState.travelClass === 'Business' ? 2.5 : 1;
+        const adjustedFare = Math.round(flight.basePrice * multiplier);
+
+        return `
+          <div class="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div class="flex items-center gap-3 min-w-[150px]">
+                <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-slate-900 to-brand-900 text-white flex items-center justify-center font-black text-xs shadow-sm">${flight.airline.slice(0, 2).toUpperCase()}</div>
+                <div>
+                  <h4 class="font-bold text-slate-900 text-sm leading-tight">${flight.airline}</h4>
+                  <span class="text-[11px] text-slate-400 font-mono">${flight.flightNo} • ${flight.aircraft}</span>
+                </div>
+              </div>
+              <div class="flex-1 grid grid-cols-3 items-center text-center max-w-sm mx-auto md:mx-0">
+                <div class="text-left"><span class="text-base sm:text-lg font-black text-slate-900 block">${flight.departTime}</span><span class="text-xs font-bold text-slate-500">${flight.origin}</span></div>
+                <div class="flex flex-col items-center px-2">
+                  <span class="text-[11px] text-slate-400 font-medium">${flight.duration}</span>
+                  <div class="w-full flex items-center my-0.5"><div class="h-0.5 bg-slate-200 flex-1"></div><div class="w-2 h-2 rounded-full ${flight.stops === 0 ? 'bg-emerald-500' : 'bg-amber-500'} mx-1"></div><div class="h-0.5 bg-slate-200 flex-1"></div></div>
+                  <span class="text-[10px] font-bold ${flight.stops === 0 ? 'text-emerald-600' : 'text-amber-600'}">${flight.stops === 0 ? 'Non-stop' : flight.layover}</span>
+                </div>
+                <div class="text-right"><span class="text-base sm:text-lg font-black text-slate-900 block">${flight.arriveTime}</span><span class="text-xs font-bold text-slate-500">${flight.dest}</span></div>
+              </div>
+              <div class="flex items-center justify-between md:flex-col md:items-end gap-1 pt-3 md:pt-0 border-t md:border-t-0 border-slate-100">
+                <div class="text-right"><div class="text-lg sm:text-xl font-black text-brand-600">₹${adjustedFare.toLocaleString('en-IN')}</div><div class="text-[10px] text-slate-400">per person (inc. fees)</div></div>
+                <button onclick="selectFlightAndProceed('${flight.id}')" class="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md transition flex items-center gap-1.5">
+                  <span>Select Seat</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+              <div class="flex items-center gap-3">
+                <span class="flex items-center gap-1"><i data-lucide="luggage" class="w-3.5 h-3.5 text-slate-400"></i>${flight.cabinClass === 'Business' ? '35kg Check-in' : '15kg Check-in'} + 7kg Cabin</span>
+                <span>•</span><span class="text-emerald-600 font-semibold">Instant e-Ticket</span>
+              </div>
+              <span class="text-amber-600 font-bold">${flight.availableSeats} seats left</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    function selectFlightAndProceed(flightId) {
+      requireAuth(() => {
+        const flight = appState.cachedFlights.find(f => f.id === flightId);
+        if (!flight) return;
+
+        appState.selectedFlight = flight;
+        appState.selectedSeats = [];
+        appState.selectedSeatFees = 0;
+
+        const multiplier = appState.travelClass === 'Business' ? 2.5 : 1;
+        const totalBase = Math.round(flight.basePrice * multiplier);
+
+        document.getElementById('seat-selection-subtitle').textContent = `Please choose ${appState.passengers} seat(s) for your travel group.`;
+        document.getElementById('seat-summary-box').innerHTML = `
+          <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+            <div class="flex justify-between font-bold text-slate-900"><span>${flight.airline} (${flight.flightNo})</span><span class="text-brand-600">₹${totalBase.toLocaleString('en-IN')}</span></div>
+            <div class="text-[11px] text-slate-500">${flight.origin} → ${flight.dest} • ${flight.aircraft}</div>
+            <div class="text-[10px] text-slate-400">${appState.departDate} | ${flight.departTime} - ${flight.arriveTime} (${flight.duration})</div>
+          </div>
+        `;
+
+        renderCabinSeats();
+        updateSeatUI();
+        navigateTo('seat-view');
+      });
+    }
+
+    function renderCabinSeats() {
+      const bizContainer = document.getElementById('seat-grid-business');
+      bizContainer.innerHTML = '';
+      [1, 2].forEach(row => {
+        ['A', 'B', 'AISLE', 'C', 'D'].forEach(col => {
+          if (col === 'AISLE') {
+            const aisle = document.createElement('div');
+            aisle.className = "flex items-center justify-center text-[10px] text-slate-300 font-bold";
+            aisle.textContent = row;
+            bizContainer.appendChild(aisle);
+          } else {
+            const seatId = `${row}${col}`;
+            const isTaken = (row === 1 && col === 'B');
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `w-8 h-8 rounded-lg text-[10px] font-bold seat-transition flex items-center justify-center ${isTaken ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300' : 'bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300'}`;
+            btn.textContent = seatId;
+            btn.dataset.seatId = seatId;
+            btn.dataset.tier = 'business';
+            btn.dataset.fee = '2500';
+            if (!isTaken) btn.onclick = () => toggleSeatClick(seatId, 2500, btn);
+            else btn.disabled = true;
+            bizContainer.appendChild(btn);
+          }
+        });
+      });
+
+      const ecoContainer = document.getElementById('seat-grid-economy');
+      ecoContainer.innerHTML = '';
+      [10, 11, 12, 14, 15].forEach(row => {
+        ['A', 'B', 'C', 'AISLE', 'D', 'E', 'F'].forEach(col => {
+          if (col === 'AISLE') {
+            const aisle = document.createElement('div');
+            aisle.className = "flex items-center justify-center text-[10px] text-slate-300 font-bold";
+            aisle.textContent = row;
+            ecoContainer.appendChild(aisle);
+          } else {
+            const seatId = `${row}${col}`;
+            const isTaken = (row === 11 && col === 'C') || (row === 14 && col === 'E');
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `w-7 h-7 rounded-md text-[9px] font-medium seat-transition flex items-center justify-center ${isTaken ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300' : 'bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200'}`;
+            btn.textContent = seatId;
+            btn.dataset.seatId = seatId;
+            btn.dataset.tier = 'economy';
+            btn.dataset.fee = '0';
+            if (!isTaken) btn.onclick = () => toggleSeatClick(seatId, 0, btn);
+            else btn.disabled = true;
+            ecoContainer.appendChild(btn);
+          }
+        });
+      });
+    }
+
+    function toggleSeatClick(seatId, fee, btn) {
+      const idx = appState.selectedSeats.indexOf(seatId);
+      if (idx > -1) {
+        appState.selectedSeats.splice(idx, 1);
+        appState.selectedSeatFees -= fee;
+        resetSeatButton(btn);
+      } else {
+        if (appState.selectedSeats.length >= appState.passengers) {
+          showToast(`You can only choose ${appState.passengers} seat(s) for your party.`);
+          return;
+        }
+        appState.selectedSeats.push(seatId);
+        appState.selectedSeatFees += fee;
+        btn.className = "w-7 sm:w-8 h-7 sm:h-8 rounded-lg text-[10px] font-bold flex items-center justify-center bg-brand-600 text-white shadow-md shadow-brand-600/30 scale-105 seat-transition";
+      }
+      updateSeatUI();
+    }
+
+    function resetSeatButton(btn) {
+      if (btn.dataset.tier === 'business') {
+        btn.className = "w-8 h-8 rounded-lg text-[10px] font-bold seat-transition flex items-center justify-center bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300";
+      } else {
+        btn.className = "w-7 h-7 rounded-md text-[9px] font-medium seat-transition flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200";
+      }
+    }
+
+    function updateSeatUI() {
+      document.getElementById('seat-selected-list').textContent = appState.selectedSeats.length > 0 ? appState.selectedSeats.join(', ') : 'None selected';
+      document.getElementById('seat-upgrade-fee').textContent = `₹${appState.selectedSeatFees.toLocaleString('en-IN')}`;
+      document.getElementById('proceed-to-passenger-btn').disabled = appState.selectedSeats.length !== appState.passengers;
+    }
+
+    function proceedToPassengerDetails() {
+      if (appState.currentUser) {
+        const names = appState.currentUser.name.split(' ');
+        document.getElementById('p-firstname').value = names[0] || '';
+        document.getElementById('p-lastname').value = names.slice(1).join(' ') || '';
+        document.getElementById('p-email').value = appState.currentUser.email || '';
+      }
+      calculateFareBreakdown();
+      navigateTo('passenger-view');
+    }
+
+    function calculateFareBreakdown() {
+      if (!appState.selectedFlight) return;
+      const multiplier = appState.travelClass === 'Business' ? 2.5 : 1;
+      const totalBase = Math.round(appState.selectedFlight.basePrice * multiplier) * appState.passengers;
+      const taxes = Math.round(totalBase * 0.12);
+      const seatFees = appState.selectedSeatFees;
+      const addonTotal = (document.getElementById('addon-baggage').checked ? 1200 : 0) + (document.getElementById('addon-insurance').checked ? 450 : 0);
+      const discount = appState.appliedDiscount || 0;
+      const finalTotal = Math.max(0, totalBase + taxes + seatFees + addonTotal - discount);
+
+      document.getElementById('fare-base-label').textContent = `Base Fare (${appState.passengers} Pax)`;
+      document.getElementById('breakdown-base-fare').textContent = `₹${totalBase.toLocaleString('en-IN')}`;
+      document.getElementById('breakdown-taxes').textContent = `₹${taxes.toLocaleString('en-IN')}`;
+      document.getElementById('breakdown-seat-fees').textContent = `₹${seatFees.toLocaleString('en-IN')}`;
+      document.getElementById('breakdown-addons').textContent = `₹${addonTotal.toLocaleString('en-IN')}`;
+      document.getElementById('breakdown-total').textContent = `₹${finalTotal.toLocaleString('en-IN')}`;
+
+      const discountRow = document.getElementById('breakdown-discount-row');
+      if (discount > 0) {
+        discountRow.classList.remove('hidden');
+        document.getElementById('breakdown-discount').textContent = `-₹${discount.toLocaleString('en-IN')}`;
+      } else discountRow.classList.add('hidden');
+
+      return finalTotal;
+    }
+
+    function applyPromoCode() {
+      const code = document.getElementById('promo-input').value.trim().toUpperCase();
+      const msg = document.getElementById('promo-status-msg');
+
+      if (code === 'SKY500') {
+        appState.appliedDiscount = 500;
+        msg.textContent = 'Voucher SKY500 applied: ₹500 discount!';
+        msg.className = 'text-[11px] mt-1 text-emerald-600 font-bold block';
+      } else if (code === 'ADMIN10') {
+        const multiplier = appState.travelClass === 'Business' ? 2.5 : 1;
+        const totalBase = Math.round(appState.selectedFlight.basePrice * multiplier) * appState.passengers;
+        appState.appliedDiscount = Math.round(totalBase * 0.10);
+        msg.textContent = `10% Partner discount applied: ₹${appState.appliedDiscount.toLocaleString('en-IN')}`;
+        msg.className = 'text-[11px] mt-1 text-emerald-600 font-bold block';
+      } else {
+        appState.appliedDiscount = 0;
+        msg.textContent = 'Invalid promo code. Try "SKY500"';
+        msg.className = 'text-[11px] mt-1 text-red-500 font-bold block';
+      }
+      calculateFareBreakdown();
+    }
+
+    async function executeBookingPayment() {
+      requireAuth(async () => {
+        const fname = document.getElementById('p-firstname').value.trim();
+        const lname = document.getElementById('p-lastname').value.trim();
+        const email = document.getElementById('p-email').value.trim();
+        const phone = document.getElementById('p-phone').value.trim();
+
+        if (!fname || !lname || !email || !phone) {
+          showToast('Please complete all mandatory passenger details.');
+          return;
+        }
+
+        const finalAmount = calculateFareBreakdown();
+        const bookingData = {
+          userId: appState.currentUser.id,
+          userEmail: appState.currentUser.email,
+          passengerName: `${fname} ${lname}`,
+          email,
+          phone,
+          flight: appState.selectedFlight,
+          flightId: appState.selectedFlight.id,
+          travelDate: appState.departDate,
+          cabinClass: appState.travelClass,
+          seats: appState.selectedSeats,
+          meal: document.getElementById('p-meal').value,
+          totalPaid: `₹${finalAmount.toLocaleString('en-IN')}`,
+          totalNumeric: finalAmount
+        };
+
+        try {
+          const createdBooking = await apiRequest('/bookings', {
+            method: 'POST',
+            body: JSON.stringify(bookingData)
+          });
+
+          document.getElementById('ticket-pnr').textContent = createdBooking.pnr;
+          document.getElementById('ticket-origin').textContent = appState.selectedFlight.origin;
+          document.getElementById('ticket-origin-city').textContent = AIRPORTS[appState.selectedFlight.origin]?.city || appState.selectedFlight.origin;
+          document.getElementById('ticket-dest').textContent = appState.selectedFlight.dest;
+          document.getElementById('ticket-dest-city').textContent = AIRPORTS[appState.selectedFlight.dest]?.city || appState.selectedFlight.dest;
+          document.getElementById('ticket-airline').textContent = `${appState.selectedFlight.airline} (${appState.selectedFlight.flightNo})`;
+          document.getElementById('ticket-depart-time').textContent = appState.selectedFlight.departTime;
+          document.getElementById('ticket-arrive-time').textContent = appState.selectedFlight.arriveTime;
+          document.getElementById('ticket-duration').textContent = appState.selectedFlight.duration;
+          document.getElementById('ticket-passenger').textContent = `${fname} ${lname}`;
+          document.getElementById('ticket-date').textContent = appState.departDate;
+          document.getElementById('ticket-seat').textContent = appState.selectedSeats.join(', ');
+          document.getElementById('ticket-class').textContent = appState.travelClass;
+
+          document.getElementById('confirmation-modal').classList.remove('hidden');
+          document.getElementById('confirmation-modal').classList.add('flex');
+          await updateUserBookingsBadge();
+          showToast('Flight successfully booked and ticket issued!');
+        } catch (err) {}
+      });
+    }
+
+    function closeConfirmationAndGoTrips() {
+      document.getElementById('confirmation-modal').classList.add('hidden');
+      document.getElementById('confirmation-modal').classList.remove('flex');
+      navigateTo('my-bookings-view');
+    }
+
+    async function renderUserBookings() {
+      const container = document.getElementById('user-bookings-list');
+      const emptyBox = document.getElementById('no-user-bookings');
+
+      if (!appState.currentUser) {
+        container.innerHTML = '';
+        emptyBox.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const bookings = await apiRequest(`/bookings?userId=${appState.currentUser.id}&email=${appState.currentUser.email}`);
+        if (bookings.length === 0) {
+          container.innerHTML = '';
+          emptyBox.classList.remove('hidden');
+          return;
+        }
+
+        emptyBox.classList.add('hidden');
+        container.innerHTML = bookings.map(b => `
+          <div class="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-3 border-b border-slate-100 gap-2">
+              <div class="flex items-center gap-2"><span class="px-2.5 py-1 rounded-xl text-xs font-black bg-brand-50 text-brand-700 font-mono">PNR: ${b.pnr}</span><span class="text-xs text-slate-600 font-semibold">${b.passengerName}</span></div>
+              <div class="flex items-center gap-3"><span class="text-xs font-bold text-emerald-600 flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5"></i> Confirmed</span><button onclick="cancelUserBooking('${b.pnr}')" class="text-xs font-bold text-red-500 hover:text-red-700 transition">Cancel Trip</button></div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-center">
+              <div><span class="text-xs text-slate-400 block">${b.flight.airline} • ${b.flight.flightNo}</span><span class="font-black text-slate-900 text-sm">${b.travelDate}</span><span class="text-xs text-slate-500 block">${b.cabinClass}</span></div>
+              <div class="sm:col-span-2 flex items-center justify-between px-2">
+                <div><span class="text-base font-black text-slate-900">${b.flight.departTime}</span><span class="text-xs text-slate-500 font-bold block">${b.flight.origin}</span></div>
+                <div class="flex flex-col items-center"><span class="text-[10px] text-slate-400 font-medium">${b.flight.duration}</span><div class="w-16 h-px bg-slate-300 my-1"></div><span class="text-[10px] text-slate-500">${b.flight.stops === 0 ? 'Direct' : '1 Stop'}</span></div>
+                <div class="text-right"><span class="text-base font-black text-slate-900">${b.flight.arriveTime}</span><span class="text-xs font-bold text-slate-500">${b.flight.dest}</span></div>
+              </div>
+              <div class="sm:text-right"><span class="text-xs text-slate-400 block">Seat(s): <strong class="text-slate-800">${b.seats.join(', ')}</strong></span><span class="font-black text-base text-brand-600 block">${b.totalPaid}</span></div>
+            </div>
+          </div>
+        `).join('');
+        lucide.createIcons();
+      } catch (err) {}
+    }
+
+    async function cancelUserBooking(pnr) {
+      try {
+        await apiRequest(`/bookings/${pnr}`, { method: 'DELETE' });
+        await renderUserBookings();
+        await updateUserBookingsBadge();
+        showToast('Booking cancelled successfully.');
+      } catch (err) {}
+    }
+
+    async function updateUserBookingsBadge() {
+      const badge = document.getElementById('nav-bookings-count');
+      if (!appState.currentUser) {
+        badge.classList.add('hidden');
+        return;
+      }
+      try {
+        const bookings = await apiRequest(`/bookings?userId=${appState.currentUser.id}&email=${appState.currentUser.email}`);
+        if (bookings.length > 0) {
+          badge.textContent = bookings.length;
+          badge.classList.remove('hidden');
+        } else badge.classList.add('hidden');
+      } catch (e) {
+        badge.classList.add('hidden');
+      }
+    }
+
+    async function renderAdminDashboard() {
+      try {
+        const [flights, bookings] = await Promise.all([
+          apiRequest('/flights'),
+          apiRequest('/bookings')
+        ]);
+
+        document.getElementById('stat-total-flights').textContent = flights.length;
+        document.getElementById('stat-total-bookings').textContent = bookings.length;
+        const rev = bookings.reduce((sum, b) => sum + (b.totalNumeric || 0), 0);
+        document.getElementById('stat-total-revenue').textContent = `₹${rev.toLocaleString('en-IN')}`;
+
+        const fTable = document.getElementById('admin-flights-table-body');
+        fTable.innerHTML = flights.map(f => `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="p-4 font-mono font-bold text-brand-700">${f.flightNo}</td>
+            <td class="p-4 font-bold text-slate-800">${f.airline}</td>
+            <td class="p-4">${f.origin} → ${f.dest}</td>
+            <td class="p-4">${f.departTime} - ${f.arriveTime}</td>
+            <td class="p-4">${f.duration}</td>
+            <td class="p-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${f.stops === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${f.stops === 0 ? 'Direct' : '1 Stop'}</span></td>
+            <td class="p-4 font-bold text-slate-900">₹${f.basePrice.toLocaleString('en-IN')}</td>
+            <td class="p-4">${f.availableSeats}</td>
+            <td class="p-4 text-right space-x-2">
+              <button onclick="editFlight('${f.id}')" class="text-brand-600 hover:text-brand-800 font-bold">Edit</button>
+              <button onclick="deleteFlight('${f.id}')" class="text-red-500 hover:text-red-700 font-bold">Delete</button>
+            </td>
+          </tr>
+        `).join('');
+
+        const bTable = document.getElementById('admin-bookings-table-body');
+        if (bookings.length === 0) {
+          bTable.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-400">No customer reservations yet.</td></tr>`;
+        } else {
+          bTable.innerHTML = bookings.map(b => `
+            <tr class="hover:bg-slate-50 transition">
+              <td class="p-4 font-mono font-bold text-amber-700">${b.pnr}</td>
+              <td class="p-4 font-bold text-slate-800">${b.passengerName}</td>
+              <td class="p-4 text-slate-500 font-mono">${b.userEmail}</td>
+              <td class="p-4 font-semibold">${b.flight.airline} (${b.flight.flightNo})</td>
+              <td class="p-4">${b.travelDate}</td>
+              <td class="p-4 font-mono font-bold">${b.seats.join(', ')}</td>
+              <td class="p-4 font-bold text-brand-600">${b.totalPaid}</td>
+              <td class="p-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Confirmed</span></td>
+            </tr>
+          `).join('');
+        }
+      } catch (err) {}
+    }
+
+    function openFlightModal(flight = null) {
+      const modal = document.getElementById('flight-modal');
+      const title = document.getElementById('flight-modal-title');
+      const form = document.getElementById('flight-form');
+
+      if (flight) {
+        title.textContent = `Edit Flight (${flight.flightNo})`;
+        document.getElementById('edit-flight-id').value = flight.id;
+        document.getElementById('mf-flightNo').value = flight.flightNo;
+        document.getElementById('mf-airline').value = flight.airline;
+        document.getElementById('mf-origin').value = flight.origin;
+        document.getElementById('mf-dest').value = flight.dest;
+        document.getElementById('mf-departTime').value = flight.departTime;
+        document.getElementById('mf-arriveTime').value = flight.arriveTime;
+        document.getElementById('mf-duration').value = flight.duration;
+        document.getElementById('mf-basePrice').value = flight.basePrice;
+        document.getElementById('mf-stops').value = flight.stops;
+        document.getElementById('mf-seats').value = flight.availableSeats;
+        document.getElementById('mf-aircraft').value = flight.aircraft || '';
+        document.getElementById('mf-layover').value = flight.layover || '';
+      } else {
+        title.textContent = 'Add New Flight';
+        form.reset();
+        document.getElementById('edit-flight-id').value = '';
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeFlightModal() {
+      document.getElementById('flight-modal').classList.add('hidden');
+      document.getElementById('flight-modal').classList.remove('flex');
+    }
+
+    async function editFlight(flightId) {
+      try {
+        const flights = await apiRequest('/flights');
+        const flight = flights.find(f => f.id === flightId);
+        if (flight) openFlightModal(flight);
+      } catch (err) {}
+    }
+
+    async function deleteFlight(flightId) {
+      try {
+        await apiRequest(`/flights/${flightId}`, { method: 'DELETE' });
+        await renderAdminDashboard();
+        await runSearch();
+        showToast('Flight schedule deleted successfully.');
+      } catch (err) {}
+    }
+
+    async function handleSaveFlight(event) {
+      event.preventDefault();
+      const id = document.getElementById('edit-flight-id').value;
+      const flightPayload = {
+        flightNo: document.getElementById('mf-flightNo').value.trim().toUpperCase(),
+        airline: document.getElementById('mf-airline').value,
+        origin: document.getElementById('mf-origin').value,
+        dest: document.getElementById('mf-dest').value,
+        departTime: document.getElementById('mf-departTime').value.trim(),
+        arriveTime: document.getElementById('mf-arriveTime').value.trim(),
+        duration: document.getElementById('mf-duration').value.trim(),
+        durationMinutes: 120,
+        basePrice: parseInt(document.getElementById('mf-basePrice').value, 10),
+        stops: parseInt(document.getElementById('mf-stops').value, 10),
+        availableSeats: parseInt(document.getElementById('mf-seats').value, 10),
+        aircraft: document.getElementById('mf-aircraft').value.trim() || 'Airbus A320neo',
+        layover: document.getElementById('mf-layover').value.trim() || null,
+        cabinClass: 'Economy'
+      };
+
+      if (flightPayload.origin === flightPayload.dest) {
+        showToast('Origin and Destination cannot be the same!');
+        return;
+      }
+
+      try {
+        if (id) {
+          await apiRequest(`/flights/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(flightPayload)
+          });
+          showToast('Flight details updated successfully.');
+        } else {
+          await apiRequest('/flights', {
+            method: 'POST',
+            body: JSON.stringify(flightPayload)
+          });
+          showToast('New flight added to schedule.');
+        }
+
+        closeFlightModal();
+        await renderAdminDashboard();
+        await runSearch();
+      } catch (err) {}
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      const savedSession = localStorage.getItem('skywing_active_session');
+      if (savedSession) {
+        appState.currentUser = JSON.parse(savedSession);
+      }
+
+      const today = new Date();
+      const depart = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const ret = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
+      const toISO = d => d.toISOString().split('T')[0];
+
+      document.getElementById('search-depart-date').value = toISO(depart);
+      document.getElementById('search-depart-date').min = toISO(today);
+      document.getElementById('search-return-date').value = toISO(ret);
+      document.getElementById('search-return-date').min = toISO(depart);
+
+      await updateAuthUI();
+      await runSearch();
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>
